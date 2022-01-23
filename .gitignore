@@ -1,0 +1,7 @@
+# Ignore generated files at build time
+*.ld
+*.map
+/build
+# Ignore submodule projects
+HAL/libopencm3
+OS/FreeRTOS
