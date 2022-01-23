@@ -17,7 +17,12 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "queue.h"
+#include "event_groups.h"
 
-#define BUFFER_CONSOLE_LEN_MAX (255)
+#define BUFFER_CONSOLE_LEN_MAX  (255)
+#define BUFFER_UART_LEN_MAX     (255)
+
+void console_debug(const char *format, ...);
 
 #endif /* MAIN_H */
