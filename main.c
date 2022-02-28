@@ -27,6 +27,7 @@ static void rn4871_process_resp(const char *buffer);
 
 void vTaskConsoleDebug(void *pvParameters);
 void vTaskBluetooth(void *pvParameters);
+void vTaskSensor(void *pvParameters);
 
 int main(void)
 {
@@ -72,6 +73,13 @@ int main(void)
     /* Tasks creation */
     xTaskCreate(vTaskBluetooth,
         (const char *)"Bluetooth",
+        configMINIMAL_STACK_SIZE * 2,
+        NULL,
+        tskIDLE_PRIORITY + 2,
+        NULL);
+
+    xTaskCreate(vTaskSensor,
+        (const char *)"Sensor",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
         tskIDLE_PRIORITY + 2,
@@ -308,5 +316,25 @@ void vTaskBluetooth(void *pvParameters)
                 rn4871_uart_tx((uint8_t*)pBufferTx, buffer_size);
             }
         }
+    }
+}
+
+void vTaskSensor(void *pvParameters)
+{
+    (void)pvParameters;
+
+    static char pData[255] = "";
+    static int cnt = 0;
+
+    while(1)
+    {
+        if(_stream_open)
+        {
+            snprintf(pData, 255, "Client %d", cnt++);
+            console_debug("[SENSOR] BLE Send %s\r\n", pData);
+            xQueueSend(xQueueBleUartTx, pData, 100);
+            xEventGroupSetBits(xEventsBleUart, FLAG_RN4871_TX);
+        }
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }
