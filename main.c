@@ -1,6 +1,8 @@
 #include "main.h"
 #include "rn4871_defs.h"
 
+#define TRANSPARENT_UART true
+
 // needed by FreeRTOS
 uint32_t SystemCoreClock;
 
@@ -177,6 +179,7 @@ static void rn4871_send_cmd(enum rn4871_cmd_e cmd)
         case CMD_DUMP_INFOS:
         case CMD_GET_DEVICE_NAME:
         case CMD_GET_VERSION:
+        case CMD_CLEAR_ALL_SERVICES:
         {
             snprintf(pBufferBleTx, BUFFER_UART_LEN_MAX, "%s\r\n", TABLE_COMMAND[cmd]);
             xQueueSend(xQueueBleUartTx, pBufferBleTx, 100);
@@ -189,7 +192,23 @@ static void rn4871_send_cmd(enum rn4871_cmd_e cmd)
             snprintf(pBufferBleTx, BUFFER_UART_LEN_MAX, "%s,C0\r\n", TABLE_COMMAND[cmd]);
             xQueueSend(xQueueBleUartTx, pBufferBleTx, 100);
             xEventGroupSetBits(xEventsBleUart, FLAG_RN4871_TX);
-        break;
+            break;
+        }
+        case CMD_CREATE_PRIVATE_SERVICE:
+        {
+            break;
+        }
+        case CMD_CREATE_PRIVATE_CHARACTERISTIC:
+        {
+            break;
+        }
+        case CMD_SERVER_WRITE_CHARACTERISTIC:
+        {
+            break;
+        }
+        case CMD_SERVER_READ_CHARACTERISTIC:
+        {
+            break;
         }
         default:
         break;
@@ -199,47 +218,47 @@ static void rn4871_send_cmd(enum rn4871_cmd_e cmd)
 
 static void rn4871_process_resp(const char *buffer)
 {
-    enum rn4871_cmd_e cmd = _current_cmd;
-    if((strstr(buffer, "CMD>") != NULL) || (strstr(buffer, "REBOOT") != NULL))
+    if(NULL != buffer)
     {
-        switch(cmd)
+        enum rn4871_cmd_e cmd = _current_cmd;
+        if((strstr(buffer, "CMD>") != NULL) || (strstr(buffer, "REBOOT") != NULL))
         {
-            case CMD_MODE_ENTER:
-                rn4871_send_cmd(CMD_DUMP_INFOS);
-                break;
-            case CMD_DUMP_INFOS:
-                rn4871_send_cmd(CMD_GET_DEVICE_NAME);
-                break;
-            case CMD_GET_DEVICE_NAME:
-                rn4871_send_cmd(CMD_GET_VERSION);
-                break;
-            case CMD_GET_VERSION:
-                rn4871_send_cmd(CMD_SET_SERVICES);
-                break;
-            case CMD_SET_SERVICES:
-                rn4871_send_cmd(CMD_REBOOT);
-                break;
-            case CMD_REBOOT:
-                _current_cmd = CMD_NONE;
-                break;
-            default:
-                _current_cmd = CMD_NONE;
-                break;
+            switch(cmd)
+            {
+                case CMD_MODE_ENTER:
+                    rn4871_send_cmd(CMD_DUMP_INFOS);
+                    break;
+                case CMD_DUMP_INFOS:
+                    rn4871_send_cmd(CMD_GET_DEVICE_NAME);
+                    break;
+                case CMD_GET_DEVICE_NAME:
+                    rn4871_send_cmd(CMD_GET_VERSION);
+                    break;
+                case CMD_GET_VERSION:
+                    if(TRANSPARENT_UART)
+                        rn4871_send_cmd(CMD_SET_SERVICES);
+                    else
+                        rn4871_send_cmd(CMD_CLEAR_ALL_SERVICES);
+                    break;
+                case CMD_SET_SERVICES:
+                    rn4871_send_cmd(CMD_REBOOT);
+                    break;
+                case CMD_REBOOT:
+                    _current_cmd = CMD_NONE;
+                    break;
+                default:
+                    _current_cmd = CMD_NONE;
+                    break;
+            }
         }
-    }
-    else if(strstr(buffer, "STREAM_OPEN") != NULL)
-    {
-        _stream_open = true;
-    }
-    else if(strstr(buffer, "DISCONNECT") != NULL)
-    {
-
-        _stream_open = false;
-    }
-    else if(strstr(buffer, "DATA") != NULL)
-    {
-        /*console_debug("[RN4871] Msg type: 0x%x Payload_len: 0x%x Payload: 0x%x%x%x%x\r\n",
-            msg->type, msg->payload_len, msg->payload[0], msg->payload[1], msg->payload[2], msg->payload[3]);*/
+        else if(strstr(buffer, "STREAM_OPEN") != NULL)
+        {
+            _stream_open = true;
+        }
+        else if(strstr(buffer, "DISCONNECT") != NULL)
+        {
+            _stream_open = false;
+        }
     }
 }
 

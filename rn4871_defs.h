@@ -20,6 +20,11 @@ enum rn4871_cmd_e {
   CMD_SET_SERVICES, /* SS */
   CMD_DUMP_INFOS, /* D */
   CMD_GET_VERSION, /* V */
+  CMD_CLEAR_ALL_SERVICES, /* PZ */
+  CMD_CREATE_PRIVATE_SERVICE, /* PS */
+  CMD_CREATE_PRIVATE_CHARACTERISTIC, /* PC */
+  CMD_SERVER_WRITE_CHARACTERISTIC, /* SHW */
+  CMD_SERVER_READ_CHARACTERISTIC, /* SHR */
 };
 
 const char TABLE_COMMAND[][10] = {
@@ -34,6 +39,11 @@ const char TABLE_COMMAND[][10] = {
   "SS",
   "D",
   "V",
+  "PZ",
+  "PS",
+  "PC",
+  "SHW",
+  "SHR",
 };
 
 #endif /* RN4871_DEFS_H */

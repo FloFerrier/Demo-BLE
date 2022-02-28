@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/cm3/nvic.h>
