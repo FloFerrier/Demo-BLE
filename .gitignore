@@ -7,3 +7,5 @@ HAL/libopencm3
 OS/FreeRTOS
 # Ignore IDE files
 .vscode/
+# Ignore python cache
+/__pycache__
