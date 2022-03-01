@@ -305,6 +305,7 @@ static void rn4871_process_resp(const char *buffer)
             time_t epoch = 0;
             if(rn4871_decode_rtc(buffer, &epoch) != -1)
             {
+                console_debug("[RTC] epoch set : %lld\r\n", epoch);
                 struct tm *time;
                 time = gmtime(&epoch);
                 rtc_calendar_set(*time);
@@ -360,7 +361,7 @@ void vTaskBluetooth(void *pvParameters)
             if(pdPASS == xQueueReceive(xQueueBleUartTx, pBufferTx, 100))
             {
                 uint16_t buffer_size = (uint16_t)strnlen(pBufferTx, (size_t)BUFFER_UART_LEN_MAX);
-                //console_debug("[BLE] Tx [%d] %s\r\n", buffer_size, pBufferTx);
+                console_debug("[BLE] Tx [%d] %s\r\n", buffer_size, pBufferTx);
                 rn4871_uart_tx((uint8_t*)pBufferTx, buffer_size);
             }
         }
@@ -388,7 +389,6 @@ void vTaskSensor(void *pvParameters)
                 epoch = mktime(&time);
                 snprintf(pBufferSensor, BUFFER_CONSOLE_LEN_MAX, "RTC:%llX", epoch);
             }
-            console_debug("[RTC] BLE Send %s\r\n", pBufferSensor);
             xQueueSend(xQueueBleUartTx, pBufferSensor, 100);
             xEventGroupSetBits(xEventsBleUart, FLAG_RN4871_TX);
         }
