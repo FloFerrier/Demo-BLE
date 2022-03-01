@@ -16,6 +16,8 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/usart.h>
 
+#include "rtc.h"
+
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"

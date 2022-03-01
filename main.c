@@ -10,6 +10,7 @@ static char pBufferConsoleDebug[BUFFER_CONSOLE_LEN_MAX+1] = "";
 static char pBufferUartTx[BUFFER_CONSOLE_LEN_MAX+1] = "";
 static char pBufferBleRx[BUFFER_UART_LEN_MAX+1] = "";
 static char pBufferBleTx[BUFFER_UART_LEN_MAX+1] = "";
+static char pBufferSensor[BUFFER_UART_LEN_MAX+1] = "";
 
 EventGroupHandle_t xEventsBleUart;
 
@@ -19,10 +20,12 @@ QueueHandle_t xQueueBleUartTx;
 
 static enum rn4871_cmd_e _current_cmd = CMD_NONE;
 static bool _stream_open = false;
+static bool _rtc_updated = false;
 
 extern void usart3_isr(void);
 static int8_t rn4871_uart_tx(uint8_t *pBuffer, uint16_t buffer_size);
 static void rn4871_send_cmd(enum rn4871_cmd_e cmd);
+static int8_t rn4871_decode_rtc(const char *buffer, time_t *epoch);
 static void rn4871_process_resp(const char *buffer);
 
 void vTaskConsoleDebug(void *pvParameters);
@@ -69,6 +72,9 @@ int main(void)
     usart_enable_rx_interrupt(USART3);
     usart_enable(USART3);
     nvic_enable_irq(NVIC_USART3_IRQ);
+
+    /* RTC init */
+    rtc_setup();
 
     /* Tasks creation */
     xTaskCreate(vTaskBluetooth,
@@ -224,6 +230,37 @@ static void rn4871_send_cmd(enum rn4871_cmd_e cmd)
     _current_cmd = cmd;
 }
 
+static int8_t rn4871_decode_rtc(const char *buffer, time_t *epoch)
+{
+    if((NULL != epoch) && (NULL != buffer))
+    {
+        char *ptr_end;
+        char *data = strchr(buffer, ':');
+        if(NULL == data)
+        {
+            // No delimiter found
+            return -1;
+        }
+
+        data++;
+        // Check if all characters are '0'-'9' or 'A'-'F' or 'a'-'f'
+        for(int idx=0; idx < (int)strlen(data); idx++)
+        {
+            if((((data[idx] >= '0') && (data[idx] <= '9')) ||
+               ((data[idx] >= 'a') && (data[idx] <= 'f'))  ||
+               ((data[idx] >= 'A') && (data[idx] <= 'F'))) != true)
+            {
+                return -1;
+            }
+        }
+
+        time_t val = strtol(data, &ptr_end, 16);
+        *epoch = val;
+        return 0;
+    }
+    return -1;
+}
+
 static void rn4871_process_resp(const char *buffer)
 {
     if(NULL != buffer)
@@ -266,6 +303,21 @@ static void rn4871_process_resp(const char *buffer)
         else if(strstr(buffer, "DISCONNECT") != NULL)
         {
             _stream_open = false;
+        }
+        else if(strstr(buffer, "RTC") != NULL)
+        {
+            time_t epoch = 0;
+            if(rn4871_decode_rtc(buffer, &epoch) != -1)
+            {
+                struct tm *time;
+                time = gmtime(&epoch);
+                rtc_calendar_set(*time);
+                _rtc_updated = true;
+            }
+            else
+            {
+                console_debug("[RTC] error to get epoch from BLE ...\r\n");
+            }
         }
     }
 }
@@ -312,7 +364,7 @@ void vTaskBluetooth(void *pvParameters)
             if(pdPASS == xQueueReceive(xQueueBleUartTx, pBufferTx, 100))
             {
                 uint16_t buffer_size = (uint16_t)strnlen(pBufferTx, (size_t)BUFFER_UART_LEN_MAX);
-                console_debug("[BLE] Tx [%d] %s\r\n", buffer_size, pBufferTx);
+                //console_debug("[BLE] Tx [%d] %s\r\n", buffer_size, pBufferTx);
                 rn4871_uart_tx((uint8_t*)pBufferTx, buffer_size);
             }
         }
@@ -323,16 +375,25 @@ void vTaskSensor(void *pvParameters)
 {
     (void)pvParameters;
 
-    static char pData[255] = "";
-    static int cnt = 0;
+    static struct tm time;
+    static time_t epoch = 0;
 
     while(1)
     {
         if(_stream_open)
         {
-            snprintf(pData, 255, "Client %d", cnt++);
-            console_debug("[SENSOR] BLE Send %s\r\n", pData);
-            xQueueSend(xQueueBleUartTx, pData, 100);
+            if(!_rtc_updated)
+            {
+                snprintf(pBufferSensor, BUFFER_CONSOLE_LEN_MAX, "RTC?");
+            }
+            else
+            {
+                time = rtc_calendar_get();
+                epoch = mktime(&time);
+                snprintf(pBufferSensor, BUFFER_CONSOLE_LEN_MAX, "RTC:%llX", epoch);
+            }
+            console_debug("[RTC] BLE Send %s\r\n", pBufferSensor);
+            xQueueSend(xQueueBleUartTx, pBufferSensor, 100);
             xEventGroupSetBits(xEventsBleUart, FLAG_RN4871_TX);
         }
         vTaskDelay(pdMS_TO_TICKS(10000));
