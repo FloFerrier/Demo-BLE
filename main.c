@@ -61,6 +61,7 @@ int main(void)
     rcc_periph_clock_enable(RCC_USART3);
     nvic_disable_irq(NVIC_USART3_IRQ);
     usart_disable_rx_interrupt(USART3);
+    usart_disable_idle_interrupt(USART3);
     usart_disable(USART3);
     usart_set_baudrate(USART3, 115200);
     usart_set_databits(USART3, 8);
@@ -95,7 +96,7 @@ int main(void)
         (const char *)"Console",
         configMINIMAL_STACK_SIZE * 2,
         NULL,
-        tskIDLE_PRIORITY + 1,
+        tskIDLE_PRIORITY + 2,
         NULL);
 
     /* Queues creation */
@@ -146,28 +147,23 @@ void vTaskConsoleDebug(void *pvParameters)
 void usart3_isr(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    static volatile uint16_t c = 0;
     static uint16_t i = 0;
-    static uint8_t cnt_delim_status = 0;
 
-    c = usart_recv(USART3);
-    pBufferBleRx[i++] = (char)c;
-    if(c == RN4871_DELIMITER_STATUS)
+    if(usart_get_flag(USART3, USART_SR_RXNE))
     {
-        ++cnt_delim_status;
+        if(i >= (BUFFER_UART_LEN_MAX - 1))
+            i = 0;
+        pBufferBleRx[i++] = (char)usart_recv(USART3);
+        usart_enable_idle_interrupt(USART3);
     }
 
-    if((c == '>') || (cnt_delim_status == 2))
+    if((usart_get_flag(USART3, USART_SR_IDLE)) && (i != 0))
     {
-        pBufferBleRx[i] = 0;
+        usart_disable_idle_interrupt(USART3);
+        pBufferBleRx[i] = '\0';
         i = 0;
-        cnt_delim_status = 0;
         xQueueSendFromISR(xQueueBleUartRx, pBufferBleRx, &xHigherPriorityTaskWoken);
         xEventGroupSetBitsFromISR(xEventsBleUart, FLAG_RN4871_RX, &xHigherPriorityTaskWoken);
-    }
-    else if(i >= (BUFFER_UART_LEN_MAX - 1))
-    {
-        i = 0;
     }
 }
 
