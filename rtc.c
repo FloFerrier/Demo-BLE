@@ -4,52 +4,35 @@
 #include <libopencm3/stm32/rtc.h>
 #include <libopencm3/stm32/rcc.h>
 
-struct bcd_s {
-  uint8_t tens;
-  uint8_t units;
-};
-
-static struct bcd_s rtc_dec_to_bcd(uint8_t dec)
+static uint8_t _rtc_dec_to_bcd(uint8_t dec)
 {
-  struct bcd_s bcd;
-  bcd.tens = dec / 10;
-  bcd.units = dec - bcd.tens * 10;
-  return bcd;
+  return (((dec / 10) << 4) | (dec % 10));
 }
 
-static uint8_t rtc_bcd_to_dec(struct bcd_s bcd)
+static uint8_t _rtc_bcd_to_dec(uint8_t bcd)
 {
-  return((uint8_t)(bcd.tens * 10 + bcd.units));
+  return (((bcd >> 4) * 10) + (bcd & 0x0F));
 }
 
 static uint32_t rtc_set_hour(uint8_t val)
 {
-  struct bcd_s bcd;
-  bcd = rtc_dec_to_bcd(val);
-  uint32_t tmp = 0;
-  tmp |= ((bcd.tens & RTC_TR_HT_MASK) << RTC_TR_HT_SHIFT);
-  tmp |= ((bcd.units & RTC_TR_HU_MASK) << RTC_TR_HU_SHIFT);
-  return tmp;
+  uint8_t bcd = _rtc_dec_to_bcd(val);
+  return ((((bcd >> 4) & RTC_TR_HT_MASK) << RTC_TR_HT_SHIFT) | \
+          (((bcd & 0x0F) & RTC_TR_HU_MASK) << RTC_TR_HU_SHIFT));
 }
 
 static uint32_t rtc_set_minute(uint8_t val)
 {
-  struct bcd_s bcd;
-  bcd = rtc_dec_to_bcd(val);
-  uint32_t tmp = 0;
-  tmp |= ((bcd.tens & RTC_TR_MNT_MASK) << RTC_TR_MNT_SHIFT);
-  tmp |= ((bcd.units & RTC_TR_MNU_MASK) << RTC_TR_MNU_SHIFT);
-  return tmp;
+  uint8_t bcd = _rtc_dec_to_bcd(val);
+  return ((((bcd >> 4) & RTC_TR_MNT_MASK) << RTC_TR_MNT_SHIFT) | \
+          (((bcd & 0x0F) & RTC_TR_MNU_MASK) << RTC_TR_MNU_SHIFT));
 }
 
 static uint32_t rtc_set_second(uint8_t val)
 {
-  struct bcd_s bcd;
-  bcd = rtc_dec_to_bcd(val);
-  uint32_t tmp = 0;
-  tmp |= ((bcd.tens & RTC_TR_ST_MASK) << RTC_TR_ST_SHIFT);
-  tmp |= ((bcd.units & RTC_TR_SU_MASK) << RTC_TR_SU_SHIFT);
-  return tmp;
+  uint8_t bcd = _rtc_dec_to_bcd(val);
+  return ((((bcd >> 4) & RTC_TR_ST_MASK) << RTC_TR_ST_SHIFT) | \
+          (((bcd & 0x0F) & RTC_TR_SU_MASK) << RTC_TR_SU_SHIFT));
 }
 
 /* Date Register contains only 1 byte for storing Year.
@@ -57,69 +40,49 @@ static uint32_t rtc_set_second(uint8_t val)
  */
 static uint32_t rtc_set_year(uint16_t val)
 {
-  struct bcd_s bcd;
-  bcd = rtc_dec_to_bcd((uint8_t)(val - 1970));
-  uint32_t tmp = 0;
-  tmp |= ((bcd.tens & RTC_DR_YT_MASK) << RTC_DR_YT_SHIFT);
-  tmp |= ((bcd.units & RTC_DR_YU_MASK) << RTC_DR_YU_SHIFT);
-  return tmp;
+  uint8_t bcd = _rtc_dec_to_bcd(val - 1970);
+  return ((((bcd >> 4) & RTC_DR_YT_MASK) << RTC_DR_YT_SHIFT) | \
+          (((bcd & 0x0F) & RTC_DR_YU_MASK) << RTC_DR_YU_SHIFT));
 }
 
 static uint32_t rtc_set_week_day(uint8_t val)
 {
-  uint32_t tmp = 0;
-  tmp |= ((val & RTC_DR_WDU_MASK) << RTC_DR_WDU_SHIFT);
-  return tmp;
+  return ((val & RTC_DR_WDU_MASK) << RTC_DR_WDU_SHIFT);
 }
 
 static uint32_t rtc_set_month(uint8_t val)
 {
-  struct bcd_s bcd;
-  bcd = rtc_dec_to_bcd(val);
-  uint32_t tmp = 0;
-  tmp |= ((bcd.tens & RTC_DR_MT_MASK) << RTC_DR_MT_SHIFT);
-  tmp |= ((bcd.units & RTC_DR_MU_MASK) << RTC_DR_MU_SHIFT);
-  return tmp;
+  uint8_t bcd = _rtc_dec_to_bcd(val);
+  return ((((bcd >> 4) & RTC_DR_MT_MASK) << RTC_DR_MT_SHIFT) | \
+          (((bcd & 0x0F) & RTC_DR_MU_MASK) << RTC_DR_MU_SHIFT));
 }
 
 static uint32_t rtc_set_day(uint8_t val)
 {
-  struct bcd_s bcd;
-  bcd = rtc_dec_to_bcd(val);
-  uint32_t tmp = 0;
-  tmp |= ((bcd.tens & RTC_DR_DT_MASK) << RTC_DR_DT_SHIFT);
-  tmp |= ((bcd.units & RTC_DR_DU_MASK) << RTC_DR_DU_SHIFT);
-  return tmp;
+  uint8_t bcd = _rtc_dec_to_bcd(val);
+  return ((((bcd >> 4) & RTC_DR_DT_MASK) << RTC_DR_DT_SHIFT) | \
+          (((bcd & 0x0F) & RTC_DR_DU_MASK) << RTC_DR_DU_SHIFT));
 }
 
 static uint8_t rtc_get_hour(void)
 {
-  uint8_t val;
-  struct bcd_s bcd;
-  bcd.tens = ((RTC_TR & (RTC_TR_HT_MASK << RTC_TR_HT_SHIFT)) >> 20);
-  bcd.units = ((RTC_TR & (RTC_TR_HU_MASK << RTC_TR_HU_SHIFT)) >> 16);
-  val = rtc_bcd_to_dec(bcd);
-  return val;
+  uint8_t bcd = (((RTC_TR & (RTC_TR_HT_MASK << RTC_TR_HT_SHIFT)) + \
+                 (RTC_TR & (RTC_TR_HU_MASK << RTC_TR_HU_SHIFT))) >> 16);
+  return _rtc_bcd_to_dec(bcd);
 }
 
 static uint8_t rtc_get_minute(void)
 {
-  uint8_t val;
-  struct bcd_s bcd;
-  bcd.tens = ((RTC_TR & (RTC_TR_MNT_MASK << RTC_TR_MNT_SHIFT)) >> 12);
-  bcd.units = ((RTC_TR & (RTC_TR_MNU_MASK << RTC_TR_MNU_SHIFT)) >> 8);
-  val = rtc_bcd_to_dec(bcd);
-  return val;
+  uint8_t bcd = (((RTC_TR & (RTC_TR_MNT_MASK << RTC_TR_MNT_SHIFT)) + \
+                 (RTC_TR & (RTC_TR_MNU_MASK << RTC_TR_MNU_SHIFT))) >> 8);
+  return _rtc_bcd_to_dec(bcd);
 }
 
 static uint8_t rtc_get_second(void)
 {
-  uint8_t val;
-  struct bcd_s bcd;
-  bcd.tens = ((RTC_TR & (RTC_TR_ST_MASK << RTC_TR_ST_SHIFT)) >> 4);
-  bcd.units = ((RTC_TR & (RTC_TR_SU_MASK << RTC_TR_SU_SHIFT)) >> 0);
-  val = rtc_bcd_to_dec(bcd);
-  return val;
+  uint8_t bcd = ((RTC_TR & (RTC_TR_ST_MASK << RTC_TR_ST_SHIFT)) + \
+                 (RTC_TR & (RTC_TR_SU_MASK << RTC_TR_SU_SHIFT)));
+  return _rtc_bcd_to_dec(bcd);
 }
 
 /* Date Register contains only 1 byte for storing Year.
@@ -127,39 +90,28 @@ static uint8_t rtc_get_second(void)
  */
 static uint16_t rtc_get_year(void)
 {
-  uint16_t val;
-  struct bcd_s bcd;
-  bcd.tens = ((RTC_DR & (RTC_DR_YT_MASK << RTC_DR_YT_SHIFT)) >> 20);
-  bcd.units = ((RTC_DR & (RTC_DR_YU_MASK << RTC_DR_YU_SHIFT)) >> 16);
-  val = rtc_bcd_to_dec(bcd) + 1970;
-  return val;
+  uint16_t bcd = (((RTC_DR & (RTC_DR_YT_MASK << RTC_DR_YT_SHIFT)) + \
+                  (RTC_DR & (RTC_DR_YU_MASK << RTC_DR_YU_SHIFT))) >> 16);
+  return (_rtc_bcd_to_dec(bcd) + 1970);
 }
 
 static uint8_t rtc_get_week_day(void)
 {
-  uint8_t val;
-  val = ((RTC_DR & (RTC_DR_WDU_MASK << RTC_DR_WDU_SHIFT)) >> 13);
-  return val;
+  return ((RTC_DR & (RTC_DR_WDU_MASK << RTC_DR_WDU_SHIFT)) >> 13);
 }
 
 static uint8_t rtc_get_month(void)
 {
-  uint8_t val;
-  struct bcd_s bcd;
-  bcd.tens = ((RTC_DR & (RTC_DR_MT_MASK << RTC_DR_MT_SHIFT)) >> 12);
-  bcd.units = ((RTC_DR & (RTC_DR_MU_MASK << RTC_DR_MU_SHIFT)) >> 8);
-  val = rtc_bcd_to_dec(bcd);
-  return val;
+  uint8_t bcd = (((RTC_DR & (RTC_DR_MT_MASK << RTC_DR_MT_SHIFT)) + \
+                 (RTC_DR & (RTC_DR_MU_MASK << RTC_DR_MU_SHIFT))) >> 8);
+  return _rtc_bcd_to_dec(bcd);
 }
 
 static uint8_t rtc_get_day(void)
 {
-  uint8_t val;
-  struct bcd_s bcd;
-  bcd.tens = ((RTC_DR & (RTC_DR_DT_MASK << RTC_DR_DT_SHIFT)) >> 4);
-  bcd.units = ((RTC_DR & (RTC_DR_DU_MASK << RTC_DR_DU_SHIFT)) >> 0);
-  val = rtc_bcd_to_dec(bcd);
-  return val;
+  uint8_t bcd = ((RTC_DR & (RTC_DR_DT_MASK << RTC_DR_DT_SHIFT)) + \
+                 (RTC_DR & (RTC_DR_DU_MASK << RTC_DR_DU_SHIFT)));
+  return _rtc_bcd_to_dec(bcd);
 }
 
 void rtc_calendar_set(struct tm tmp)
