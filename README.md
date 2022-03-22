@@ -1,4 +1,6 @@
 # Demo-BLE
+[![Build Status](https://app.travis-ci.com/FloFerrier/Demo-BLE.svg?branch=master)](https://app.travis-ci.com/FloFerrier/Demo-BLE)
+
 This project contains source code for embedded target and python script.
 
 - Embedded Target: NUCLEO-F446RE
